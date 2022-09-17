@@ -26,7 +26,7 @@ const BucketName = "upload";
 const fileStream = s3Client
   .getObject({
     Bucket: BucketName,
-    Key: "videoplayback.mp4",
+    Key: "210329_06B_Bali_1080p_013.mp4",
   })
   .createReadStream();
 fileStream.on("error", function (err) {
@@ -48,26 +48,36 @@ fileStream.on("error", function (err) {
 const folderName = randomUUID();
 mkdirSync(folderName);
 
-// ffmpeg(fileStream)
-//   .audioCodec("libopus")
-//   .audioBitrate(96)
-//   .outputOptions([
-//     "-codec: copy",
-//     "-hls_time 10",
-//     "-hls_playlist_type vod",
-//     // "-hls_base_url http://localhost:8080/",
-//     `-hls_segment_filename ./${folderName}/%03d.ts`,
-//   ])
-//   .output(`./${folderName}/outputfile.m3u8`)
-//   .on("progress", function (progress) {
-//     console.log("Processing: " + JSON.stringify(progress) + "% done");
-//   })
-//   .on("end", function (err, stdout, stderr) {
-//     console.log("Finished processing!" /*, err, stdout, stderr*/);
-//     events.emit(uploadingEvent, folderName);
-//   })
-//   .run();
-uploadDir(path.resolve("c7d92a2b-de8b-461b-bfb5-050d74006a6e"), BucketName);
+ffmpeg(fileStream)
+  .audioCodec("libopus")
+  .audioBitrate(96)
+  .outputOptions([
+    "-codec: copy",
+    "-hls_time 10",
+    // "-hls_playlist_type vod",
+    // "-hls_base_url http://localhost:8080/",
+    // `-map 0:v:0 -map 0:a:0 -map 0:v:0 -map 0:a:0 -map 0:v:0 -map 0:a:0`,
+    `-hls_segment_filename ./${folderName}/%03d.ts`,
+    // " -c:v libx264 -crf 22 -c:a aac -ar 48000",
+    "-b:v:0 4000k -b:v:1 2000k -b:v:2 1000k -b:v:3 300k",
+    // " -filter:v:0 scale=w=480:h=360  -maxrate:v:0 600k -b:a:0 500k",
+    // "-filter:v:1 scale=w=640:h=480  -maxrate:v:1 1500k -b:a:1 1000k",
+    // "-filter:v:2 scale=w=1280:h=720 -maxrate:v:2 3000k -b:a:2 2000k",
+    // `-var_stream_map "v:0,a:0,name:360p v:1,a:1,name:480p v:2,a:2,name:720p"`,
+    "-filter:v:0 scale=-2:1080 -filter:v:1 scale=-2:720 -filter:v:2 scale=-2:480 -filter:v:3 scale=-2:240",
+    // "-map 0:v -map 0:v -map 0:v -map 0:v -map 0:a -map 0:a",
+    // '-var_stream_map "v:0,a:0 v:1,a:0 v:2,a:0 v:3,a:1"',
+    // `-preset fast -hls_list_size 10 -threads 0 -f hl`,
+  ])
+  .output(`./${folderName}/outputfile.m3u8`)
+  .on("progress", function (progress) {
+    console.log("Processing: " + JSON.stringify(progress) + "% done");
+  })
+  .on("end", function (err, stdout, stderr) {
+    console.log("Finished processing!" /*, err, stdout, stderr*/);
+    events.emit(uploadingEvent, folderName);
+  })
+  .run();
 
 events.addListener(uploadingEvent, (folderName) => {
   uploadDir(path.resolve(folderName), BucketName);
